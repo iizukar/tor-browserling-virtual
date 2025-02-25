@@ -1,29 +1,48 @@
-FROM python:3.9-slim
+FROM alpine:latest
+
+# Enable community repo for firefox-esr
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
 
 # Install dependencies
-RUN apt-get update && apt-get install -y \
-    tor \
-    firefox-esr \
+RUN apk add --no-cache \
     xvfb \
-    wget \
-    && wget https://github.com/mozilla/geckodriver/releases/download/v0.30.0/geckodriver-v0.30.0-linux64.tar.gz \
-    && tar -xzf geckodriver-v0.30.0-linux64.tar.gz -C /usr/local/bin \
-    && rm geckodriver-v0.30.0-linux64.tar.gz \
-    && apt-get purge -y wget \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
+    fluxbox \
+    firefox-esr \
+    x11vnc \
+    git \
+    tor \
+    bash \
+    sudo \
+    procps \
+    tini \
+    netcat-openbsd
 
-# Configure Tor
-COPY torrc /etc/tor/torrc
+# Clone noVNC and clean up
+RUN git clone https://github.com/novnc/noVNC.git /opt/noVNC \
+    && git clone https://github.com/novnc/websockify /opt/noVNC/utils/websockify \
+    && rm -rf /opt/noVNC/.git \
+    && apk del git
 
-# Copy code
-COPY app.py .
-COPY start.sh .
+# Configure Tor with hashed password
+RUN tor --hash-password mypassword | tail -n1 > /tmp/tor-pass && \
+    echo "ControlPort 9051" >> /etc/tor/torrc && \
+    echo "HashedControlPassword $(cat /tmp/tor-pass)" >> /etc/tor/torrc && \
+    rm /tmp/tor-pass
 
-# Install Python dependencies
-RUN pip install selenium stem pyvirtualdisplay
+# Configure Firefox to use Tor proxy
+RUN mkdir -p /etc/firefox-esr/pref/ && \
+    echo 'user_pref("network.proxy.type", 1); \
+    user_pref("network.proxy.socks", "127.0.0.1"); \
+    user_pref("network.proxy.socks_port", 9050); \
+    user_pref("network.proxy.socks_remote_dns", true); \
+    user_pref("network.dns.blockDotOnion", false);' > /etc/firefox-esr/pref/user.js
 
-# Set permissions
-RUN chmod +x start.sh
+# Copy scripts
+COPY start.sh /start.sh
+COPY renew_identity.sh /renew_identity.sh
+RUN chmod +x /start.sh /renew_identity.sh
 
-CMD ["./start.sh"]
+EXPOSE 8080
+
+ENTRYPOINT ["tini", "--"]
+CMD ["/start.sh"]
