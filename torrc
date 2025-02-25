@@ -1,4 +1,4 @@
-SocksPort 0.0.0.0:9050
-ControlPort 0.0.0.0:9051
-HashedControlPassword 16:872860B76453A77D60CA2BB8C1A704209209497079549F00A41C8B1E587
-CookieAuthentication 0
+ControlPort 9051
+HashedControlPassword 16:872860B76453A77D60CA2BB8C1A704207A3278A3665D8D2F3A96F95E2A
+DataDirectory /var/lib/tor
+CookieAuthentication 1
